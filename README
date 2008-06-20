@@ -1,0 +1,42 @@
+NOTE && TODO:  This has been tested on Rails 2.0.2 only.
+It contains some activesupport'isms, and... they should definitely be
+stripped out and this plugin made into a proper gem.
+
+
+Description
+==============
+  This is an extremely light weight interface to postgresql 8.3's built
+  in text searching.  There exists an acts_as_tsearch, but this is its
+  smaller and built specifically for 8.3, more pointed, brother.
+  It lacks many features, but is useful in most text searching scenerios.
+
+  This plugin assumes a lot.  The lot is:
+    - Configuration is default, most likely pg_catalog.simple, unless
+      init chooses another lc_ctype
+    - GIN index by default.  You can pass in :index => 'GIST' if you'd like to change that.
+    - Default tsvector is a coellesced composite of the fields you pass in.
+
+
+Usage
+==============
+  - ensure your table has a tsvector ts_index column
+    ... in create table block:  t.tsvector :ts_index
+
+  - ensure your model declares text_searchable properly
+    ... text_searchable :fields => [:name, :description]
+
+  - YourModel.find_by_text_search("moose OR mousse")
+    ... returns result set.  supports most googlish ands and ors and double quoting
+    ... supports WillPaginate pagination, and the will_paginate view helper
+
+  - YourModel.count_by_text_search("moose OR mousse")
+    ... returns the number of matches
+
+
+Todo
+==============
+most importantly... document, and turn it into a gem
+
+also.... weighting, highlighting, optional native triggers,
+custom parsers/templates/rankers, custom config with 2 parameter tsvector,
+multiple vectors, multitable support
