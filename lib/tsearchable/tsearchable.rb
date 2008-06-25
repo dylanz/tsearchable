@@ -11,7 +11,7 @@ module TSearchable
       @config.each {|k,v| instance_variable_set(:"@#{k}", v)}
       raise "You must explicitly specify which fields you want to be searchable" unless @fields
 
-      @indexable_fields = @fields.inject([]) {|a,f| a << "coalesce(#{f.to_s},'')"}.join(' || ')
+      @indexable_fields = @fields.inject([]) {|a,f| a << "coalesce(#{f.to_s},'')"}.join(' || \' \' || ')
 
       after_save :update_tsvector_row
       define_method(:per_page) { 30 } unless respond_to?(:per_page)

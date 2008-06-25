@@ -1,5 +1,38 @@
 #mostly from acts_as_tsearch
 #partially from http://www.height1percent.com/articles/category/postgresql
+
+# give jdbc some tsvector love
+module ::JdbcSpec
+  module PostgreSQL
+    def modify_types(tp)
+      tp[:primary_key] = "serial primary key"
+      tp[:string][:limit] = 255
+      tp[:integer][:limit] = nil
+      tp[:boolean][:limit] = nil
+
+      # ensure tsvectors have no limits appended
+      tp[:tsvector][:limit] = nil if tp[:tsvector]
+      tp
+    end
+
+    module Column
+      def simplified_type(field_type)
+        return :integer if field_type =~ /^serial/i 
+        return :string if field_type =~ /\[\]$/i || field_type =~ /^interval/i
+        return :string if field_type =~ /^(?:point|lseg|box|"?path"?|polygon|circle)/i
+        return :datetime if field_type =~ /^timestamp/i
+        return :float if field_type =~ /^real|^money/i
+        return :binary if field_type =~ /^bytea/i
+        return :boolean if field_type =~ /^bool/i
+
+        # declaring an explicit tsvector column type
+        return :tsvector if field_type =~ /^tsvector/i
+        super
+      end
+    end
+  end
+end
+
 module ActiveRecord
   module ConnectionAdapters
     class TableDefinition
