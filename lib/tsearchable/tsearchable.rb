@@ -6,13 +6,13 @@ module TSearchable
 
   module ClassMethods
     def tsearchable(options = {})
-      @config = {:index => 'gin', :vector_name => 'ts_index', :suggest => [] }
+      @config = {:index => 'gin', :vector_name => 'ts_index' }
       @config.update(options) if options.is_a?(Hash)
       @config.each {|k,v| instance_variable_set(:"@#{k}", v)}
-      raise "You must explicitly specify which fields you want to be searchable" unless @fields
+      raise "You must explicitly specify which fields you want to be searchable" unless @fields or @suggest
 
-      @indexable_fields = @fields.inject([]) {|a,f| a << "coalesce(#{f.to_s},'')"}.join(' || \' \' || ')
-      @suggestable_fields = options[:suggest]
+      @indexable_fields = @fields.inject([]) {|a,f| a << "coalesce(#{f.to_s},'')"}.join(' || \' \' || ') if not @fields.nil?
+      @suggestable_fields = @suggest if not @suggest.nil?
 
       after_save :update_tsvector_row
       define_method(:per_page) { 30 } unless respond_to?(:per_page)
@@ -35,25 +35,13 @@ module TSearchable
   module SingletonMethods
     def find_by_text_search(keyword, options = {})
       raise ActiveRecord::RecordNotFound, "Couldn't find #{name} without a keyword" if keyword.blank?
+      
       query = "#{@vector_name} @@ to_tsquery('#{parse(keyword)}')"
+      
       options[:conditions] ? (options[:conditions] << ("AND " << query)) : (options[:conditions] = query)
+      options[:page] = nil if not options.key?(:page)
 
-      # will paginate integration.  see the results class.
-      if options[:page] && !options[:page][:count]
-        Results.create(options[:page], options[:per_page], options[:total_entries]) do |pager|
-          count_options = options.except(:page, :per_page, :total_entries)
-          find_options  = count_options.except(:count)
-
-          find_options.update({:limit => pager.per_page, :offset => pager.offset})
-          pager.replace(find(:all, find_options))
-
-          unless pager.total_entries
-            pager.total_entries = self.count(:all, count_options)
-          end
-        end
-      else
-        find(:all, options)
-      end
+      paginate(options)
     end
 
     def count_by_text_search(keyword, options = {})
@@ -62,7 +50,6 @@ module TSearchable
       results.empty? ? 0 : results.at(0)[:count].to_i
     end
     
-    # TODO: implementer la pagination
     def find_by_trgm(keyword, options = {})
       raise ActiveRecord::RecordNotFound, "Couldn't find #{name} without a keyword" if keyword.blank?
       return if @suggestable_fields.empty?
@@ -75,10 +62,12 @@ module TSearchable
       end
       query = query.join(" AND ")
       sel = sel.join(", ")
+      
       options[:conditions] ? (options[:conditions] << ("AND " << query)) : (options[:conditions] = query)
       options[:select] = "*, " << sel
+      options[:page] = nil if not options.key?(:page)
       
-      find(:all, options)
+      paginate(options)
     end
 
     def update_tsvector(rowid = nil)

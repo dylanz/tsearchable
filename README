@@ -45,7 +45,6 @@ Usage
 	
   - YourModel.find_by_trgm("keyword")
 	... returns result set.  supports most googlish ands and ors and double quoting
-  	... TODO: WillPaginate support
 
 Todo
 ==============
