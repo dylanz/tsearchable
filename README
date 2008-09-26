@@ -1,4 +1,4 @@
-NOTE && TODO:  This has been tested on Rails 2.0.2 only.
+NOTE && TODO:  This has been tested on Rails 2.0.2, 2.1.0 and 2.1.1 only.
 It contains some activesupport'isms, and... they should definitely be
 stripped out and this plugin made into a proper gem.
 
@@ -11,11 +11,10 @@ Description
   It lacks many features, but is useful in most text searching scenerios.
 
   This plugin assumes a lot.  The lot is:
-    - Configuration is default, most likely pg_catalog.simple, unless
-      init chooses another lc_ctype
+    - Default language used for full text search is english. Use :catalog => 'pg_catalog.french' to change that.
     - GIN index by default.  You can pass in :index => 'GIST' if you'd like to change that.
     - Default tsvector is a coellesced composite of the fields you pass in.
-	- OPTIONAL: if you want to use suggestion feature ("do you mean x ?") pg_trgm has to be activated like this: 
+    - OPTIONAL: if you want to use suggestion feature ("do you mean x ?") pg_trgm has to be activated like this: 
 		psql database_name < /path_to_your_pg_contrib_folder/pg_trgm.sql
 		(see http://www.postgresql.org/docs/8.3/static/pgtrgm.html for more details about pg_trgm)
 		
@@ -28,6 +27,10 @@ Usage
 
   - ensure your model declares text_searchable properly
     ... tsearchable :fields => [:name, :description]
+
+  - create tsvector index and trigger using rake task
+    ... rake tsearchable:vectors:create VECTOR=name_of_the_model
+    ... rake tsearchable:triggers:create VECTOR=name_of_the_model
 
   - YourModel.find_by_text_search("moose OR mousse")
     ... returns result set.  supports most googlish ands and ors and double quoting
@@ -44,13 +47,14 @@ Usage
 	... tsearchable :suggests => [ :title ]
 	
   - YourModel.find_by_trgm("keyword")
-	... returns result set.  supports most googlish ands and ors and double quoting
+	... returns result set.
 
-Todo
+TODO
 ==============
 most importantly... document, and turn it into a gem
 
-also.... weighting, highlighting, optional native triggers,
-custom parsers/templates/rankers, custom config with 2 parameter tsvector,
-multiple vectors, multitable support
-rake tasks for automatic tsvector and index creation
+also: 
+- weighting, highlighting, 
+- custom parsers/templates/rankers, 
+- multiple vectors, 
+- multitable support
