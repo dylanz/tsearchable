@@ -6,7 +6,7 @@ module TSearchable
 
   module ClassMethods
     def tsearchable(options = {})
-      @config = {:index => 'gin', :vector_name => 'ts_index' }
+      @config = {:index => 'gist', :vector_name => 'ts_index', :catalog => 'pg_catalog.english' }
       @config.update(options) if options.is_a?(Hash)
       @config.each {|k,v| instance_variable_set(:"@#{k}", v)}
       raise "You must explicitly specify which fields you want to be searchable" unless @fields or @suggest
@@ -14,7 +14,7 @@ module TSearchable
       @indexable_fields = @fields.inject([]) {|a,f| a << "coalesce(#{f.to_s},'')"}.join(' || \' \' || ') if not @fields.nil?
       @suggestable_fields = @suggest if not @suggest.nil?
 
-      after_save :update_tsvector_row
+#      after_save :update_tsvector_row
       define_method(:per_page) { 30 } unless respond_to?(:per_page)
       include TSearchable::InstanceMethods
     end
@@ -78,7 +78,7 @@ module TSearchable
       end
       update = "UPDATE #{table_name} SET #{@vector_name} = to_tsvector(#{@indexable_fields})"
       update << " WHERE #{table_name}.id = #{rowid}" if rowid
-      connection.execute(update)
+      execute_query(update)
     end
     alias_method :update_vector, :update_tsvector
 
@@ -88,7 +88,7 @@ module TSearchable
       
       sql << "ALTER TABLE #{table_name} ADD COLUMN #{@vector_name} tsvector"
       sql << "CREATE INDEX #{table_name}_ts_idx ON #{table_name} USING #{@index}(#{@vector_name})"
-      sql.each {|s| update_table { connection.execute(s) }}
+      execute_query(sql)
     end
     alias_method :create_vector, :create_tsvector
     
@@ -97,9 +97,17 @@ module TSearchable
       return if column_names.include?(@vector_name)
       
       @suggestable_fields.each do |field|
-        sql << "CREATE INDEX index_#{table_name}_#{table_name}_trgm ON #{table_name} USING gist(#{field} gist_trgm_ops)"
+        sql << "CREATE INDEX index_#{table_name}_#{field}_trgm ON #{table_name} USING gist(#{field} gist_trgm_ops)"
       end
-      sql.each {|s| update_table { connection.execute(s) }}
+      execute_query(sql)
+    end
+
+    # creates the trigger to auto-update vector column
+    def create_trigger(sql = "")
+      create_tsvector(sql) if not column_names.include?(@vector_name)
+
+      sql << "CREATE TRIGGER tsvectorupdate_#{table_name}_#{@vector_name} BEFORE INSERT OR UPDATE ON #{table_name} FOR EACH ROW EXECUTE PROCEDURE tsvector_update_trigger(#{@vector_name}, '#{@catalog}', " << @fields.join(' ,') << ')'
+      execute_query(sql)
     end
 
     # googly search terms to tsearch format.  jacked from bens acts_as_tsearch.
@@ -126,6 +134,16 @@ module TSearchable
 
     def count_all_indexable
       count(:conditions => {:is_indexable => true})
+    end
+
+    private
+
+    def execute_query(sql)
+      if sql.is_a? Array then
+        sql.each {|s| update_table { connection.execute(s) }}
+      else
+        update_table { connection.execute(sql) }
+      end
     end
   end
 end

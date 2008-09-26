@@ -15,7 +15,7 @@ Description
       init chooses another lc_ctype
     - GIN index by default.  You can pass in :index => 'GIST' if you'd like to change that.
     - Default tsvector is a coellesced composite of the fields you pass in.
-	- OPTIONAL: if you want to use suggestion feature ("do you mean x ?") pg_trgm has been activated like this: 
+	- OPTIONAL: if you want to use suggestion feature ("do you mean x ?") pg_trgm has to be activated like this: 
 		psql database_name < /path_to_your_pg_contrib_folder/pg_trgm.sql
 		(see http://www.postgresql.org/docs/8.3/static/pgtrgm.html for more details about pg_trgm)
 		
